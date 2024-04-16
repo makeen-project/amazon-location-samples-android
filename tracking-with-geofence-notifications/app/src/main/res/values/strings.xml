@@ -1,0 +1,35 @@
+<resources>
+    <string name="app_name">Amazon Tracking SDK Sample App</string>
+    <string name="btn_sign_in">Sign In</string>
+    <string name="btn_sign_out">Sign Out</string>
+    <string name="btn_start_tracking">Start Tracking in Foreground</string>
+    <string name="btn_stop_tracking">Stop Tracking in Foreground</string>
+    <string name="btn_battery_optimization_start">Start Tracking in Background (Battery Saver)</string>
+    <string name="btn_battery_optimization_stop">Stop Tracking in Background (Battery Saver)</string>
+    <string name="label_permission_required">Permission Required</string>
+    <string name="label_open_settings">Open Settings</string>
+    <string name="label_cancel">Cancel</string>
+    <string name="error_label_location">Cannot proceed without location permission. Please grant it in settings.</string>
+    <string name="start_tracking_in_background">Start Tracking in Background</string>
+    <string name="stop_tracking_in_background">Stop Tracking in Background</string>
+    <string name="label_all_permission_granted">All permission granted</string>
+    <string name="error_label_notification">Cannot proceed without notification permission. Please grant it in settings.</string>
+    <string name="label_geofence_is_breached">Geofence is breached</string>
+    <string name="label_tracker_entered_in_geofence_id">Tracker entered in geofence id %1$s</string>
+    <string name="tab_configuration">Configuration</string>
+    <string name="tab_tracking">Tracking</string>
+    <string name="label_auth_section">Auth section</string>
+    <string name="label_identity_pool_id">Identity Pool ID</string>
+    <string name="label_config_section">Config section</string>
+    <string name="label_log_in_to_access_configuration_settings">Log in to access configuration settings</string>
+    <string name="error_please_enter_identity_pool_id">Please enter identity pool id</string>
+    <string name="label_time_filter">Time filter</string>
+    <string name="label_distance_filter">Distance filter</string>
+    <string name="label_accuracy_filter">Accuracy filter</string>
+    <string name="label_meter">meter</string>
+    <string name="label_second">second</string>
+    <string name="label_tracker_name">Tracker name</string>
+    <string name="label_map_name">Map name</string>
+    <string name="error_please_enter_tracker_name">Please enter tracker name</string>
+    <string name="error_please_enter_map_name">Please enter map name</string>
+</resources>
