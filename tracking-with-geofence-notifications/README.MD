@@ -2,6 +2,8 @@
 
 This sample app demonstrates how to integrate AWS Location Service with an Android application using Amazon Cognito for authentication and tracking location updates in real time. It showcases the usage of Amazon Location Service's Tracking and Authentication SDKs to authenticate users and track their location on a map.
 
+Additional documentation for this sample application is available from the [Amazon Location Service documentation website](https://docs.aws.amazon.com/location/latest/developerguide/qs-android-tracking.html).
+
 - **Tracking SDK**: [Amazon Location Service Tracking SDK](https://github.com/aws-geospatial/amazon-location-mobile-tracking-sdk-android)
 - **Auth SDK**: [Amazon Location Service Authentication SDK](https://github.com/aws-geospatial/amazon-location-mobile-auth-sdk-android)
 
