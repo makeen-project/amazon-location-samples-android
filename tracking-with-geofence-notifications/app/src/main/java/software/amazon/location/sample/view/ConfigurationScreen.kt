@@ -36,12 +36,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.mapbox.mapboxsdk.maps.MapView
-import com.mapbox.mapboxsdk.maps.OnMapReadyCallback
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.OnMapReadyCallback
 import software.amazon.location.sample.R
 import software.amazon.location.sample.utils.Constant.MAX_DISTANCE_FILTER_VALUE
 import software.amazon.location.sample.utils.Constant.MAX_TIME_FILTER_VALUE
