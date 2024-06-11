@@ -58,9 +58,7 @@ class MqttHelper(
 
     private fun subscribeTopic(identityId: String) {
         try {
-            val topicName = "$identityId/${BuildConfig.TOPIC_TRACKER}"
-            val qos = AWSIotQos.QOS0
-            val topic = object : AWSIotTopic(topicName, qos) {
+            val topic = object : AWSIotTopic("$identityId/${BuildConfig.TOPIC_TRACKER}", AWSIotQos.QOS0) {
                 override fun onMessage(message: AWSIotMessage?) {
                     message?.let {
                         val payloadBytes = it.payload
