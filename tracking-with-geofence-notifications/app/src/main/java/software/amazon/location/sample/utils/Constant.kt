@@ -11,4 +11,6 @@ object Constant {
     const val PREFS_KEY_IDENTITY_POOL_ID = "identityPoolId"
     const val PREFS_KEY_TRACKER_NAME = "trackerName"
     const val PREFS_KEY_MAP_NAME = "mapName"
+    const val PREFS_KEY_IDENTITY_ID = "identityId"
+    const val TIME_OUT = 20000L
 }

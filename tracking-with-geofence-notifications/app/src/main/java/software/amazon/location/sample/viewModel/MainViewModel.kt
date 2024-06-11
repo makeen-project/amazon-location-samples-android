@@ -11,18 +11,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.ViewModel
-import com.amazonaws.auth.CognitoCredentialsProvider
-import com.amazonaws.internal.keyvaluestore.AWSKeyValueStore
-import com.amazonaws.services.geo.AmazonLocationClient
-import com.amazonaws.services.geo.model.BatchEvaluateGeofencesRequest
-import com.amazonaws.services.geo.model.DevicePositionUpdate
 import com.google.gson.GsonBuilder
-import com.mapbox.mapboxsdk.module.http.HttpRequestUtil
-import okhttp3.OkHttpClient
+import software.amazon.location.auth.EncryptedSharedPreferences
+import software.amazon.location.auth.LocationCredentialsProvider
 import software.amazon.location.sample.BuildConfig
 import software.amazon.location.sample.utils.Constant.PREFS_NAME_TRACKING
-import software.amazon.location.sample.utils.Constant.SERVICE_NAME
-import software.amazon.location.sample.utils.SigV4Interceptor
 import software.amazon.location.tracking.LocationTracker
 import software.amazon.location.tracking.aws.LocationTrackingCallback
 import software.amazon.location.tracking.config.LocationTrackerConfig
@@ -38,7 +31,6 @@ import software.amazon.location.tracking.util.BackgroundTrackingMode
 import software.amazon.location.tracking.util.Logger
 import software.amazon.location.tracking.util.ServiceCallback
 import software.amazon.location.tracking.util.StoreKey
-import java.util.Date
 
 class MainViewModel : ViewModel() {
     var locationTracker: LocationTracker? = null
@@ -60,9 +52,8 @@ class MainViewModel : ViewModel() {
     var lastAccuracyMeasured by mutableStateOf("")
     var isConfigDialogVisible: Boolean by mutableStateOf(false)
     var selectedTrackingMode = BackgroundTrackingMode.ACTIVE_TRACKING
-    var amazonLocationClient: AmazonLocationClient? = null
-    var mCognitoCredentialsProvider: CognitoCredentialsProvider? = null
     var enableGeofences = false
+    var locationCredentialsProvider: LocationCredentialsProvider? = null
 
     fun setDistanceFilterData() {
         locationTracker?.checkFilterIsExistsAndUpdateValue(
@@ -123,38 +114,15 @@ class MainViewModel : ViewModel() {
             isLocationTrackingBatteryOptimizeActive = true
         }
     }
-    fun evaluateGeofence(
+
+    suspend fun evaluateGeofence(
         locationEntry: List<LocationEntry>,
-        deviceId: String
+        deviceId: String,
+        identityId: String
     ): Boolean {
-        val map: HashMap<String, String> = HashMap()
-        mCognitoCredentialsProvider?.identityId?.let { identityPId ->
-            identityPId.split(":").let { splitStringList ->
-                splitStringList[0].let { region ->
-                    map["region"] = region
-                }
-                splitStringList[1].let { id ->
-                    map["id"] = id
-                }
-            }
-        }
-        val devicePositionUpdateList = arrayListOf<DevicePositionUpdate>()
-
-        locationEntry.forEach {
-            val devicePositionUpdate =
-                DevicePositionUpdate().withPosition(it.longitude, it.latitude)
-                    .withDeviceId(deviceId)
-                    .withSampleTime(Date())
-                    .withPositionProperties(map)
-            devicePositionUpdateList.add(devicePositionUpdate)
-        }
-
-        val data =
-            BatchEvaluateGeofencesRequest().withCollectionName(BuildConfig.GEOFENCE_COLLECTION_NAME)
-                .withDevicePositionUpdates(devicePositionUpdateList)
         return try {
-            amazonLocationClient?.batchEvaluateGeofences(data)
-            true
+            val response = locationTracker?.batchEvaluateGeofences(locationEntry, deviceId, identityId, BuildConfig.GEOFENCE_COLLECTION_NAME)
+            response != null
         } catch (e: Exception) {
             e.printStackTrace()
             false
@@ -165,24 +133,16 @@ class MainViewModel : ViewModel() {
         isLoading = false
         authenticated = true
         isConfigDialogVisible = false
-        mCognitoCredentialsProvider?.let { provider ->
-            HttpRequestUtil.setOkHttpClient(
-                OkHttpClient.Builder()
-                    .addInterceptor(SigV4Interceptor(provider, SERVICE_NAME))
-                    .build(),
-            )
-        }
     }
 
     fun checkFilterData(context: Context) {
         val locationTrackerConfig = GsonBuilder()
             .registerTypeAdapter(LocationFilter::class.java, LocationFilterAdapter())
             .create().fromJson(
-                AWSKeyValueStore(
+                EncryptedSharedPreferences(
                     context,
                     PREFS_NAME_TRACKING,
-                    true,
-                ).get(StoreKey.CLIENT_CONFIG) ?: throw Exception("Client config not found"),
+                ).apply { initEncryptedSharedPreferences() }.get(StoreKey.CLIENT_CONFIG)?: throw Exception("Client config not found"),
                 LocationTrackerConfig::class.java,
             )
         locationTrackerConfig?.let { config ->
@@ -210,7 +170,11 @@ class MainViewModel : ViewModel() {
     /**
      * Subscribes to location updates and updates the UI button text accordingly.
      */
-    fun startTrackingForeground(context: Context, locationTrackingCallback: LocationTrackingCallback, onRequestPermissionsResultCallback: () -> Unit) {
+    fun startTrackingForeground(
+        context: Context,
+        locationTrackingCallback: LocationTrackingCallback,
+        onRequestPermissionsResultCallback: () -> Unit
+    ) {
         Logger.log("Checking location permission")
         if (checkLocationPermission(context)) {
             Logger.log("Location permission not granted. Requesting permission")

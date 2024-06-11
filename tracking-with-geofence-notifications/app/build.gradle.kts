@@ -73,16 +73,25 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.constraintlayout:constraintlayout-compose:1.0.1")
     implementation("com.google.android.gms:play-services-location:21.1.0")
-    implementation("com.amazonaws:aws-android-sdk-auth-userpools:2.73.0")
-    implementation("com.amazonaws:aws-android-sdk-iot:2.72.0")
-    implementation("com.amazonaws:aws-android-sdk-location:2.72.0")
-    implementation("org.maplibre.gl:android-sdk:10.2.0")
-    implementation("com.squareup.okhttp3:okhttp:4.9.2")
+    implementation("org.maplibre.gl:android-sdk:11.0.0-pre5")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("aws.sdk.kotlin:cognitoidentity:1.2.21")
+    implementation("com.amazonaws:aws-iot-device-sdk-java:1.3.9")
+    implementation("aws.sdk.kotlin:iot:1.2.28")
+    implementation("aws.sdk.kotlin:location:1.2.21")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.5")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.6.5")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
-    implementation("software.amazon.location:auth:0.0.1")
-    implementation("software.amazon.location:tracking:0.0.1")
+    if (findProject(":authSdk") != null) {
+        implementation(project(mapOf("path" to ":authSdk")))
+    } else {
+        implementation("software.amazon.location:auth:0.0.1")
+    }
+    if (findProject(":trackingSdk") != null) {
+        implementation(project(mapOf("path" to ":trackingSdk")))
+    } else {
+        implementation("software.amazon.location:tracking:0.0.1")
+    }
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
