@@ -11,9 +11,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.ViewModel
-import aws.sdk.kotlin.services.location.model.BatchEvaluateGeofencesRequest
-import aws.sdk.kotlin.services.location.model.DevicePositionUpdate
-import aws.smithy.kotlin.runtime.time.Instant
 import com.google.gson.GsonBuilder
 import software.amazon.location.auth.EncryptedSharedPreferences
 import software.amazon.location.auth.LocationCredentialsProvider
@@ -120,39 +117,11 @@ class MainViewModel : ViewModel() {
 
     suspend fun evaluateGeofence(
         locationEntry: List<LocationEntry>,
-        mDeviceId: String,
+        deviceId: String,
         identityId: String
     ): Boolean {
-        val map: HashMap<String, String> = HashMap()
-        identityId.split(":").let { splitStringList ->
-            splitStringList[0].let { region ->
-                map["region"] = region
-            }
-            splitStringList[1].let { id ->
-                map["id"] = id
-            }
-        }
-        val devicePositionUpdateList = arrayListOf<DevicePositionUpdate>()
-
-        locationEntry.forEach {
-            val devicePositionUpdate =
-                DevicePositionUpdate {
-                    position = listOf(it.longitude, it.latitude)
-                    deviceId = mDeviceId
-                    sampleTime = Instant.now()
-                    positionProperties = map
-                }
-
-            devicePositionUpdateList.add(devicePositionUpdate)
-        }
-
-        val data =
-            BatchEvaluateGeofencesRequest {
-                collectionName = BuildConfig.GEOFENCE_COLLECTION_NAME
-                devicePositionUpdates = devicePositionUpdateList
-            }
         return try {
-            val response = locationTracker?.batchEvaluateGeofences(data)
+            val response = locationTracker?.batchEvaluateGeofences(locationEntry, deviceId, identityId, BuildConfig.GEOFENCE_COLLECTION_NAME)
             response != null
         } catch (e: Exception) {
             e.printStackTrace()
