@@ -246,7 +246,7 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, MapLibreMap.OnCame
     }
 
     /**
-     * Signs in the user by authenticating with the API key
+     * Signs in the user by authenticating with the identityPoolId
      */
     private fun signInUser() {
         coroutineScope.launch {
