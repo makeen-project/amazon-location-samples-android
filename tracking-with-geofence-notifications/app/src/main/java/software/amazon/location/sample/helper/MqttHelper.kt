@@ -1,127 +1,140 @@
 package software.amazon.location.sample.helper
 
 import android.content.Context
-import com.amazonaws.auth.CognitoCredentialsProvider
-import com.amazonaws.mobile.auth.core.internal.util.ThreadUtils
-import com.amazonaws.mobileconnectors.iot.AWSIotMqttClientStatusCallback
-import com.amazonaws.mobileconnectors.iot.AWSIotMqttManager
-import com.amazonaws.mobileconnectors.iot.AWSIotMqttQos
-import com.amazonaws.regions.Region
-import software.amazon.location.sample.data.EvaluateGeofenceData
-import software.amazon.location.tracking.util.Logger
-import com.amazonaws.services.iot.AWSIotClient
-import com.amazonaws.services.iot.model.AttachPolicyRequest
+import aws.sdk.kotlin.services.iot.IotClient
+import aws.sdk.kotlin.services.iot.model.AttachPolicyRequest
+import aws.sdk.kotlin.services.cognitoidentity.model.Credentials
+import com.amazonaws.services.iot.client.AWSIotMessage
+import com.amazonaws.services.iot.client.AWSIotMqttClient
+import com.amazonaws.services.iot.client.AWSIotQos
+import com.amazonaws.services.iot.client.AWSIotTopic
+import com.amazonaws.services.iot.client.auth.CredentialsProvider
+import com.amazonaws.services.iot.client.auth.StaticCredentialsProvider
 import com.google.gson.Gson
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import software.amazon.location.sample.BuildConfig
 import software.amazon.location.sample.R
+import software.amazon.location.sample.data.EvaluateGeofenceData
+import software.amazon.location.sample.utils.Constant.TIME_OUT
+import software.amazon.location.tracking.util.Logger
 
 class MqttHelper(
     private val context: Context,
-    private val mCognitoCredentialsProvider: CognitoCredentialsProvider?
+    private val credentials: Credentials?,
+    private val identityId: String,
 ) {
 
-    private var mqttManager: AWSIotMqttManager? = null
+    private var mqttClient: AWSIotMqttClient? = null
     private var lastNotificationId: Int = 1211
+
     fun startMqttManager() {
-        if (mqttManager != null) stopMqttManager()
-        mqttManager =
-            AWSIotMqttManager(
-                mCognitoCredentialsProvider?.identityId,
-                BuildConfig.MQTT_END_POINT,
-            )
-        mqttManager?.isAutoReconnect = false
-        mqttManager?.keepAlive = 60
-        mqttManager?.setCleanSession(true)
+        if (mqttClient != null) stopMqttManager()
+
+        val clientEndpoint = BuildConfig.MQTT_END_POINT
+
+        val credentials = createCredentialsProvider()
+        mqttClient = AWSIotMqttClient(clientEndpoint, identityId, credentials, identityId.split(":")[0])
+
         try {
-            mqttManager?.connect(mCognitoCredentialsProvider) { status, throwable ->
-                ThreadUtils.runOnUiThread {
-                    when (status) {
-                        AWSIotMqttClientStatusCallback.AWSIotMqttClientStatus.Connecting -> {
-                            Logger.log("AWSIotMqttClientStatus.Connecting")
-                        }
-
-                        AWSIotMqttClientStatusCallback.AWSIotMqttClientStatus.Connected -> {
-                            Logger.log("AWSIotMqttClientStatus.Connected")
-                            mCognitoCredentialsProvider?.identityId?.let { subscribeTopic(it) }
-                        }
-
-                        AWSIotMqttClientStatusCallback.AWSIotMqttClientStatus.Reconnecting -> {
-                            Logger.log("AWSIotMqttClientStatus.Reconnecting")
-                        }
-
-                        AWSIotMqttClientStatusCallback.AWSIotMqttClientStatus.ConnectionLost -> {
-                            Logger.log("AWSIotMqttClientStatus.ConnectionLost")
-                            throwable?.printStackTrace()
-                        }
-
-                        else -> {}
-                    }
-                }
-            }
+            mqttClient?.connect()
+            subscribeTopic(identityId)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
+    private fun createCredentialsProvider(): CredentialsProvider {
+        if (credentials?.accessKeyId == null || credentials.sessionToken == null) throw Exception("Credentials not found")
+        return StaticCredentialsProvider(
+            com.amazonaws.services.iot.client.auth.Credentials(
+                credentials.accessKeyId,
+                credentials.secretKey,
+                credentials.sessionToken,
+            )
+        )
+    }
+
     private fun subscribeTopic(identityId: String) {
         try {
-            mqttManager?.subscribeToTopic(
-                "$identityId/${BuildConfig.TOPIC_TRACKER}",
-                AWSIotMqttQos.QOS0,
-            ) { _, data ->
-                val stringData = String(data)
-                if (stringData.isNotEmpty()) {
-                    val notificationData =
-                        Gson().fromJson(stringData, EvaluateGeofenceData::class.java)
-                    context.let {
-                        if (notificationData.trackerEventType.equals("ENTER", true)) {
-                            Logger.log("subscribeTopic ENTER")
-                            val subTitle = context.getString(
-                                R.string.label_tracker_entered_in_geofence_id,
-                                notificationData.geofenceId,
-                            )
-                            NotificationHelper().showNotification(
-                                it,
-                                it.getString(R.string.label_geofence_is_breached),
-                                subTitle,
-                                lastNotificationId,
-                            )
-                            lastNotificationId++
+            val topic = object : AWSIotTopic("$identityId/${BuildConfig.TOPIC_TRACKER}", AWSIotQos.QOS0) {
+                override fun onMessage(message: AWSIotMessage?) {
+                    message?.let {
+                        val payloadBytes = it.payload
+                        val stringData = String(payloadBytes)
+                        if (stringData.isNotEmpty()) {
+                            val notificationData =
+                                Gson().fromJson(stringData, EvaluateGeofenceData::class.java)
+                            context.let { context ->
+                                if (notificationData.trackerEventType.equals("ENTER", true)) {
+                                    val subTitle = context.getString(
+                                        R.string.label_tracker_entered_in_geofence_id,
+                                        notificationData.geofenceId,
+                                    )
+                                    NotificationHelper().showNotification(
+                                        context,
+                                        context.getString(R.string.label_geofence_is_breached),
+                                        subTitle,
+                                        lastNotificationId,
+                                    )
+                                    lastNotificationId++
+                                }
+                            }
                         }
                     }
                 }
             }
+            mqttClient?.subscribe(topic, TIME_OUT)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
     fun stopMqttManager() {
-        if (mqttManager != null) {
+        if (mqttClient != null) {
             try {
-                mqttManager?.unsubscribeTopic("${mCognitoCredentialsProvider?.identityId}/${BuildConfig.TOPIC_TRACKER}")
+                mqttClient?.unsubscribe("${identityId}/${BuildConfig.TOPIC_TRACKER}")
             } catch (e: Exception) {
-                Logger.log("stopMqttManager unsubscribeTopic", e)
+                Logger.log("stopMqttManager unsubscribe", e)
             }
 
             try {
-                mqttManager?.disconnect()
+                mqttClient?.disconnect()
             } catch (e: Exception) {
                 Logger.log("stopMqttManager disconnect", e)
             }
-            mqttManager = null
         }
     }
 
     fun setIotPolicy() {
-        val identityId: String? = mCognitoCredentialsProvider?.identityId
+        CoroutineScope(Dispatchers.IO).launch {
+            val attachPolicyRequest = AttachPolicyRequest {
+                policyName = BuildConfig.POLICY_NAME
+                target = identityId
+            }
 
-        val attachPolicyReq = AttachPolicyRequest().withPolicyName(BuildConfig.POLICY_NAME)
-            .withTarget(identityId)
-        val mIotAndroidClient = AWSIotClient(mCognitoCredentialsProvider)
-        val region = identityId?.split(":")?.get(0)
+            val iotClient = IotClient {
+                region = identityId.split(":")[0]
+                credentialsProvider = createCredentialsProviderForPolicy()
+            }
 
-        mIotAndroidClient.setRegion(Region.getRegion(region))
-        mIotAndroidClient.attachPolicy(attachPolicyReq)
+            try {
+                iotClient.attachPolicy(attachPolicyRequest)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun createCredentialsProviderForPolicy(): aws.smithy.kotlin.runtime.auth.awscredentials.CredentialsProvider {
+        if (credentials?.accessKeyId == null || credentials.sessionToken == null || credentials.secretKey == null) throw Exception("Credentials not found")
+        return aws.sdk.kotlin.runtime.auth.credentials.StaticCredentialsProvider(
+            aws.smithy.kotlin.runtime.auth.awscredentials.Credentials.invoke(
+                accessKeyId = credentials.accessKeyId!!,
+                secretAccessKey = credentials.secretKey!!,
+                sessionToken = credentials.sessionToken,
+            )
+        )
     }
 }

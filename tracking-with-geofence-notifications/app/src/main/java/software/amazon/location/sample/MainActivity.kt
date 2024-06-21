@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Gravity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,22 +37,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
-import com.amazonaws.auth.CognitoCredentialsProvider
-import com.amazonaws.internal.keyvaluestore.AWSKeyValueStore
-import com.amazonaws.regions.Region
-import com.amazonaws.regions.Regions
-import com.amazonaws.services.geo.AmazonLocationClient
 import com.google.android.gms.location.Priority
-import com.mapbox.mapboxsdk.Mapbox
-import com.mapbox.mapboxsdk.maps.MapboxMap
-import com.mapbox.mapboxsdk.maps.OnMapReadyCallback
-import com.mapbox.mapboxsdk.maps.Style
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import org.maplibre.android.MapLibre
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.OnMapReadyCallback
+import org.maplibre.android.maps.Style
+import org.maplibre.android.module.http.HttpRequestUtil
 import software.amazon.location.auth.AuthHelper
-import software.amazon.location.auth.LocationCredentialsProvider
+import software.amazon.location.auth.AwsSignerInterceptor
+import software.amazon.location.auth.EncryptedSharedPreferences
 import software.amazon.location.sample.helper.DialogHelper
 import software.amazon.location.sample.helper.Helper
 import software.amazon.location.sample.helper.MqttHelper
@@ -60,7 +61,6 @@ import software.amazon.location.sample.utils.Constant
 import software.amazon.location.sample.view.ConfigurationScreen
 import software.amazon.location.sample.view.TrackingScreen
 import software.amazon.location.sample.viewModel.MainViewModel
-import software.amazon.location.tracking.LocationTracker
 import software.amazon.location.tracking.aws.LocationTrackingCallback
 import software.amazon.location.tracking.config.LocationTrackerConfig
 import software.amazon.location.tracking.config.NotificationConfig
@@ -74,9 +74,9 @@ import software.amazon.location.tracking.util.TrackingSdkLogLevel
 
 class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCallback {
 
+    private lateinit var encryptedSharedPreferences: EncryptedSharedPreferences
     private lateinit var authHelper: AuthHelper
     private lateinit var deviceIdProvider: DeviceIdProvider
-    private var locationCredentialsProvider: LocationCredentialsProvider? = null
     private val coroutineScope = MainScope()
     private var isForBackgroundPermissionAsked: Boolean = false
     private var mqttHelper: MqttHelper? = null
@@ -187,7 +187,7 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        Mapbox.getInstance(this)
+        MapLibre.getInstance(this)
         super.onCreate(savedInstanceState)
         deviceIdProvider = DeviceIdProvider(applicationContext)
         authHelper = AuthHelper(applicationContext)
@@ -357,31 +357,55 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
      */
     private fun signInUser(isAlreadySignedIn: Boolean) {
         coroutineScope.launch {
-            val awsKeyValueStore = AWSKeyValueStore(this@MainActivity, Constant.PREFS_NAME_AUTH, true)
+            encryptedSharedPreferences =
+                EncryptedSharedPreferences(this@MainActivity, Constant.PREFS_NAME_AUTH)
+            encryptedSharedPreferences.initEncryptedSharedPreferences()
             if (isAlreadySignedIn) {
-                mainViewModel.identityPoolId = awsKeyValueStore.get(Constant.PREFS_KEY_IDENTITY_POOL_ID)
-                mainViewModel.trackerName = awsKeyValueStore.get(Constant.PREFS_KEY_TRACKER_NAME)
-                mainViewModel.mapName = awsKeyValueStore.get(Constant.PREFS_KEY_MAP_NAME)
+                mainViewModel.identityPoolId =
+                    encryptedSharedPreferences.get(Constant.PREFS_KEY_IDENTITY_POOL_ID) ?: ""
+                mainViewModel.trackerName =
+                    encryptedSharedPreferences.get(Constant.PREFS_KEY_TRACKER_NAME) ?: ""
+                mainViewModel.mapName =
+                    encryptedSharedPreferences.get(Constant.PREFS_KEY_MAP_NAME) ?: ""
             }
             if (mainViewModel.identityPoolId.isEmpty()) {
-                helper.showToast(getString(R.string.error_please_enter_identity_pool_id), this@MainActivity)
+                helper.showToast(
+                    getString(R.string.error_please_enter_identity_pool_id),
+                    this@MainActivity
+                )
                 return@launch
             }
             if (mainViewModel.trackerName.isEmpty()) {
-                helper.showToast(getString(R.string.error_please_enter_tracker_name), this@MainActivity)
+                helper.showToast(
+                    getString(R.string.error_please_enter_tracker_name),
+                    this@MainActivity
+                )
                 return@launch
             }
             if (mainViewModel.mapName.isEmpty()) {
                 helper.showToast(getString(R.string.error_please_enter_map_name), this@MainActivity)
                 return@launch
             }
-            awsKeyValueStore.put(Constant.PREFS_KEY_TRACKER_NAME, mainViewModel.trackerName)
-            awsKeyValueStore.put(Constant.PREFS_KEY_MAP_NAME, mainViewModel.mapName)
-            mainViewModel.isLoading = true
-            locationCredentialsProvider = authHelper.authenticateWithCognitoIdentityPool(
-                mainViewModel.identityPoolId,
+            encryptedSharedPreferences.put(
+                Constant.PREFS_KEY_TRACKER_NAME,
+                mainViewModel.trackerName
             )
-            locationCredentialsProvider?.let {
+            encryptedSharedPreferences.put(Constant.PREFS_KEY_MAP_NAME, mainViewModel.mapName)
+            mainViewModel.isLoading = true
+            mainViewModel.initializeLocationCredentialsProvider(authHelper)
+            mainViewModel.setUserAuthenticated()
+            mainViewModel.locationCredentialsProvider?.let {
+                HttpRequestUtil.setOkHttpClient(
+                    OkHttpClient.Builder()
+                        .addInterceptor(
+                            AwsSignerInterceptor(
+                                Constant.SERVICE_NAME,
+                                mainViewModel.identityPoolId.split(":")[0],
+                                it
+                            )
+                        )
+                        .build()
+                )
                 val config = LocationTrackerConfig(
                     trackerName = mainViewModel.trackerName,
                     logLevel = TrackingSdkLogLevel.DEBUG,
@@ -394,31 +418,15 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
                         notificationImageId = R.drawable.ic_drive,
                     ),
                 )
-                mainViewModel.locationTracker = LocationTracker(
-                    applicationContext,
-                    it,
-                    config,
-                )
+                mainViewModel.initializeLocationTracker(applicationContext, it, config)
                 Logger.log("Signed in")
                 Logger.log("Device ID: ${deviceIdProvider.getDeviceID()}")
                 val sharedPreferences =
                     getSharedPreferences(Constant.PREFS_NAME, MODE_PRIVATE)
                 sharedPreferences.edit().putBoolean(Constant.KEY_AUTHENTICATED, true)
                     .apply()
-                mainViewModel.mCognitoCredentialsProvider = CognitoCredentialsProvider(
-                    mainViewModel.identityPoolId,
-                    Regions.fromName(mainViewModel.identityPoolId.split(":")[0]),
-                )
-                mainViewModel.amazonLocationClient =
-                    AmazonLocationClient(mainViewModel.mCognitoCredentialsProvider)
-                mainViewModel.amazonLocationClient?.setRegion(
-                    Region.getRegion(
-                        mainViewModel.identityPoolId.split(":")[0]
-                    )
-                )
                 initMqtt()
                 mainViewModel.checkFilterData(this@MainActivity)
-                mainViewModel.setUserAuthenticated()
             }
         }
     }
@@ -428,13 +436,12 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
             if (!mainViewModel.enableGeofences) {
                 return@launch
             }
-            mainViewModel.mCognitoCredentialsProvider?.refresh()
-            if (mqttHelper == null) {
-                mqttHelper = MqttHelper(
-                    applicationContext,
-                    mainViewModel.mCognitoCredentialsProvider
-                )
-            }
+            val identityId = encryptedSharedPreferences.get(Constant.PREFS_KEY_IDENTITY_ID) ?: ""
+            mqttHelper = MqttHelper(
+                applicationContext,
+                mainViewModel.locationCredentialsProvider?.getCredentialsProvider(),
+                identityId
+            )
             mqttHelper?.setIotPolicy()
             mqttHelper?.startMqttManager()
         }
@@ -445,7 +452,7 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
      * updating authentication status, and resetting UI elements.
      */
     private fun signOutUser() {
-        locationCredentialsProvider?.clear()
+        mainViewModel.locationCredentialsProvider?.clear()
         mainViewModel.locationTracker = null
 
         mainViewModel.authenticated = false
@@ -520,7 +527,8 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
             if (!mainViewModel.enableGeofences) {
                 return@launch
             }
-            mainViewModel.evaluateGeofence(entries, helper.getDeviceId(applicationContext))
+            val identityId = encryptedSharedPreferences.get(Constant.PREFS_KEY_IDENTITY_ID) ?: ""
+            mainViewModel.evaluateGeofence(entries, helper.getDeviceId(applicationContext), identityId)
         }
         if (mainViewModel.accuracyFilterEnabled && entries.isNotEmpty()) {
             mainViewModel.lastAccuracyMeasured =
@@ -536,12 +544,19 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
         Logger.log("getDeviceLocation onLocationAvailabilityChanged")
     }
 
-    override fun onMapReady(map: MapboxMap) {
+    override fun onMapReady(map: MapLibreMap) {
         map.setStyle(
             Style.Builder()
                 .fromUri("https://maps.geo.${mainViewModel.identityPoolId.split(":")[0]}.amazonaws.com/maps/v0/maps/${mainViewModel.mapName}/style-descriptor"),
         ) {
-            map.uiSettings.isAttributionEnabled = false
+            map.uiSettings.isAttributionEnabled = true
+            map.uiSettings.isLogoEnabled = false
+            map.uiSettings.attributionGravity = Gravity.BOTTOM or Gravity.END
+            val initialPosition = LatLng(47.6160281982247, -122.32642111977668)
+            map.cameraPosition = CameraPosition.Builder()
+                .target(initialPosition)
+                .zoom(14.0)
+                .build()
         }
     }
 }
