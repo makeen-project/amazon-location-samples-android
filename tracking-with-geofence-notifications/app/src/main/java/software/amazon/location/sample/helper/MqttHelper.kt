@@ -104,7 +104,6 @@ class MqttHelper(
             } catch (e: Exception) {
                 Logger.log("stopMqttManager disconnect", e)
             }
-            mqttClient = null
         }
     }
 

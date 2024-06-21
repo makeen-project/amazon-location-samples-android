@@ -11,7 +11,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.google.gson.GsonBuilder
+import kotlinx.coroutines.async
+import software.amazon.location.auth.AuthHelper
 import software.amazon.location.auth.EncryptedSharedPreferences
 import software.amazon.location.auth.LocationCredentialsProvider
 import software.amazon.location.sample.BuildConfig
@@ -54,6 +57,22 @@ class MainViewModel : ViewModel() {
     var selectedTrackingMode = BackgroundTrackingMode.ACTIVE_TRACKING
     var enableGeofences = false
     var locationCredentialsProvider: LocationCredentialsProvider? = null
+
+    suspend fun initializeLocationCredentialsProvider(authHelper: AuthHelper) {
+        locationCredentialsProvider = viewModelScope.async {
+            authHelper.authenticateWithCognitoIdentityPool(identityPoolId)
+        }.await()
+    }
+
+    suspend fun initializeLocationTracker(
+        context: Context,
+        locationCredentialsProvider: LocationCredentialsProvider,
+        config: LocationTrackerConfig
+    ) {
+        locationTracker = viewModelScope.async {
+            LocationTracker(context, locationCredentialsProvider, config)
+        }.await()
+    }
 
     fun setDistanceFilterData() {
         locationTracker?.checkFilterIsExistsAndUpdateValue(

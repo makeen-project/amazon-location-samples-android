@@ -46,7 +46,7 @@ class MainViewModelValidationTest {
     }
 
     @Test
-    fun `test checkValidations when apiKey is empty`() {
+    fun `test checkValidations when mapName is empty`() {
         every { mockHelper.showToast(any(), any()) } just runs
         viewModel.identityPoolId = IDENTITY_POOL_ID
         viewModel.mapName = ""

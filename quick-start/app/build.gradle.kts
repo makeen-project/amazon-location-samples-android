@@ -12,7 +12,7 @@ android {
     customConfig.load(project.rootProject.file("custom.properties").inputStream())
     defaultConfig {
         applicationId = "com.amazon.androidquickstartapp"
-        minSdk = 24
+        minSdk = 21
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -78,12 +78,12 @@ dependencies {
     if (findProject(":authSdk") != null) {
         implementation(project(mapOf("path" to ":authSdk")))
     } else {
-        implementation("software.amazon.location:auth:0.0.1")
+        implementation(libs.auth)
     }
     if (findProject(":trackingSdk") != null) {
         implementation(project(mapOf("path" to ":trackingSdk")))
     } else {
-        implementation("software.amazon.location:tracking:0.0.1")
+        implementation(libs.tracking)
     }
     testImplementation(libs.mockk)
     testImplementation(libs.mockito.core)
