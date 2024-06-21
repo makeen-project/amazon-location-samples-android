@@ -27,9 +27,12 @@ import org.maplibre.android.location.OnLocationCameraTransitionListener
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.maps.MapLibreMap
 import com.amazon.androidquickstartapp.utils.AmazonLocationClient
+import kotlinx.coroutines.async
+import software.amazon.location.auth.AuthHelper
 import software.amazon.location.auth.LocationCredentialsProvider
 import software.amazon.location.tracking.LocationTracker
 import software.amazon.location.tracking.aws.LocationTrackingCallback
+import software.amazon.location.tracking.config.LocationTrackerConfig
 
 class MainViewModel : ViewModel() {
     var locationTracker: LocationTracker? = null
@@ -49,6 +52,22 @@ class MainViewModel : ViewModel() {
     var helper = Helper()
     var mapHelper = MapHelper()
     var layerSize: Int = 0
+
+    suspend fun initializeLocationCredentialsProvider(authHelper: AuthHelper) {
+        locationCredentialsProvider = viewModelScope.async {
+            authHelper.authenticateWithCognitoIdentityPool(identityPoolId)
+        }.await()
+    }
+
+    suspend fun initializeLocationTracker(
+        context: Context,
+        locationCredentialsProvider: LocationCredentialsProvider,
+        config: LocationTrackerConfig
+    ) {
+        locationTracker = viewModelScope.async {
+            LocationTracker(context, locationCredentialsProvider, config)
+        }.await()
+    }
 
     suspend fun reverseGeocode(latLng: LatLng): String? {
         try {

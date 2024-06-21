@@ -41,7 +41,6 @@ import com.google.android.gms.location.Priority
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.maplibre.android.MapLibre
@@ -62,7 +61,6 @@ import software.amazon.location.sample.utils.Constant
 import software.amazon.location.sample.view.ConfigurationScreen
 import software.amazon.location.sample.view.TrackingScreen
 import software.amazon.location.sample.viewModel.MainViewModel
-import software.amazon.location.tracking.LocationTracker
 import software.amazon.location.tracking.aws.LocationTrackingCallback
 import software.amazon.location.tracking.config.LocationTrackerConfig
 import software.amazon.location.tracking.config.NotificationConfig
@@ -394,24 +392,20 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
             )
             encryptedSharedPreferences.put(Constant.PREFS_KEY_MAP_NAME, mainViewModel.mapName)
             mainViewModel.isLoading = true
-            mainViewModel.locationCredentialsProvider = async {
-                authHelper.authenticateWithCognitoIdentityPool(
-                    mainViewModel.identityPoolId,
-                )
-            }.await()
+            mainViewModel.initializeLocationCredentialsProvider(authHelper)
             mainViewModel.setUserAuthenticated()
-            HttpRequestUtil.setOkHttpClient(
-                OkHttpClient.Builder()
-                    .addInterceptor(
-                        AwsSignerInterceptor(
-                            Constant.SERVICE_NAME,
-                            mainViewModel.identityPoolId.split(":")[0],
-                            mainViewModel.locationCredentialsProvider
-                        )
-                    )
-                    .build()
-            )
             mainViewModel.locationCredentialsProvider?.let {
+                HttpRequestUtil.setOkHttpClient(
+                    OkHttpClient.Builder()
+                        .addInterceptor(
+                            AwsSignerInterceptor(
+                                Constant.SERVICE_NAME,
+                                mainViewModel.identityPoolId.split(":")[0],
+                                it
+                            )
+                        )
+                        .build()
+                )
                 val config = LocationTrackerConfig(
                     trackerName = mainViewModel.trackerName,
                     logLevel = TrackingSdkLogLevel.DEBUG,
@@ -424,11 +418,7 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
                         notificationImageId = R.drawable.ic_drive,
                     ),
                 )
-                mainViewModel.locationTracker = LocationTracker(
-                    applicationContext,
-                    it,
-                    config,
-                )
+                mainViewModel.initializeLocationTracker(applicationContext, it, config)
                 Logger.log("Signed in")
                 Logger.log("Device ID: ${deviceIdProvider.getDeviceID()}")
                 val sharedPreferences =
@@ -446,14 +436,12 @@ class MainActivity : ComponentActivity(), LocationTrackingCallback, OnMapReadyCa
             if (!mainViewModel.enableGeofences) {
                 return@launch
             }
-            if (mqttHelper == null) {
-                val identityId = encryptedSharedPreferences.get(Constant.PREFS_KEY_IDENTITY_ID) ?: ""
-                mqttHelper = MqttHelper(
-                    applicationContext,
-                    mainViewModel.locationCredentialsProvider?.getCredentialsProvider(),
-                    identityId
-                )
-            }
+            val identityId = encryptedSharedPreferences.get(Constant.PREFS_KEY_IDENTITY_ID) ?: ""
+            mqttHelper = MqttHelper(
+                applicationContext,
+                mainViewModel.locationCredentialsProvider?.getCredentialsProvider(),
+                identityId
+            )
             mqttHelper?.setIotPolicy()
             mqttHelper?.startMqttManager()
         }

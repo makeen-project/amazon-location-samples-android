@@ -12,7 +12,7 @@ android {
     customConfig.load(project.rootProject.file("custom.properties").inputStream())
     defaultConfig {
         applicationId = "software.amazon.location.sample"
-        minSdk = 24
+        minSdk = 21
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -85,12 +85,12 @@ dependencies {
     if (findProject(":authSdk") != null) {
         implementation(project(mapOf("path" to ":authSdk")))
     } else {
-        implementation("software.amazon.location:auth:0.0.1")
+        implementation("software.amazon.location:auth:0.2.4")
     }
     if (findProject(":trackingSdk") != null) {
         implementation(project(mapOf("path" to ":trackingSdk")))
     } else {
-        implementation("software.amazon.location:tracking:0.0.1")
+        implementation("software.amazon.location:tracking:0.2.4")
     }
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

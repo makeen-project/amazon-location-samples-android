@@ -30,7 +30,6 @@ import com.amazon.androidquickstartapp.utils.DialogHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.maplibre.android.MapLibre
@@ -43,7 +42,6 @@ import org.maplibre.android.module.http.HttpRequestUtil
 import org.maplibre.geojson.Point
 import software.amazon.location.auth.AuthHelper
 import software.amazon.location.auth.AwsSignerInterceptor
-import software.amazon.location.tracking.LocationTracker
 import software.amazon.location.tracking.aws.LocationTrackingCallback
 import software.amazon.location.tracking.config.LocationTrackerConfig
 import software.amazon.location.tracking.database.LocationEntry
@@ -252,24 +250,20 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, MapLibreMap.OnCame
         coroutineScope.launch {
             if (mainViewModel.checkValidations(this@MainActivity)) return@launch
             authHelper = AuthHelper(applicationContext)
-            mainViewModel.locationCredentialsProvider = async {
-                authHelper.authenticateWithCognitoIdentityPool(
-                    mainViewModel.identityPoolId,
-                )
-            }.await()
+            mainViewModel.initializeLocationCredentialsProvider(authHelper)
             mainViewModel.authenticated = true
-            HttpRequestUtil.setOkHttpClient(
-                OkHttpClient.Builder()
-                    .addInterceptor(
-                        AwsSignerInterceptor(
-                            SERVICE_NAME,
-                            mainViewModel.region,
-                            mainViewModel.locationCredentialsProvider
-                        )
-                    )
-                    .build()
-            )
             mainViewModel.locationCredentialsProvider?.let {
+                HttpRequestUtil.setOkHttpClient(
+                    OkHttpClient.Builder()
+                        .addInterceptor(
+                            AwsSignerInterceptor(
+                                SERVICE_NAME,
+                                mainViewModel.region,
+                                it
+                            )
+                        )
+                        .build()
+                )
                 val config = LocationTrackerConfig(
                     trackerName = mainViewModel.trackerName,
                     logLevel = TrackingSdkLogLevel.DEBUG,
@@ -277,11 +271,7 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, MapLibreMap.OnCame
                     waitForAccurateLocation = false,
                     minUpdateIntervalMillis = TRACKING_MIN_UPDATE_INTERVAL_MILLIS,
                 )
-                mainViewModel.locationTracker = LocationTracker(
-                    applicationContext,
-                    it,
-                    config,
-                )
+                mainViewModel.initializeLocationTracker(applicationContext, it, config)
                 mainViewModel.locationTracker?.enableFilter(TimeLocationFilter())
                 mainViewModel.locationTracker?.enableFilter(DistanceLocationFilter())
             }

@@ -26,7 +26,6 @@ custom.properties
 build/
 dist/
 **.sample
-#amplify-do-not-edit-end
 /app/release/
 /authSdk/
 /trackingSdk/
