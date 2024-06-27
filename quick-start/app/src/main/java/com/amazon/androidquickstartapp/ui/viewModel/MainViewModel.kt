@@ -180,7 +180,8 @@ class MainViewModel : ViewModel() {
     /**
      * Unsubscribes from location updates and updates the UI button text accordingly.
      */
-    fun stopTrackingForeground() {
+    fun stopTrackingForeground(context: Context) {
+        if (checkLocationPermission(context)) return
         isLocationTrackingForegroundActive = false
         locationTracker?.stop()
     }

@@ -3,6 +3,9 @@ package com.amazon.androidquickstartapp.utils
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Looper
 import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
@@ -16,6 +19,7 @@ import com.amazon.androidquickstartapp.utils.Constants.WAIT_FOR_ACCURATE_LOCATIO
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,10 +41,15 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
+import software.amazon.location.tracking.config.SdkConfig.MIN_DISTANCE
+import software.amazon.location.tracking.util.Helper
 
 class MapHelper {
     private var fusedLocationClient: FusedLocationProviderClient? = null
+    private var locationManager: LocationManager? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Default)
+    private val helper = Helper()
+
     fun enableLocationComponent(
         it: Style,
         context: Context,
@@ -66,7 +75,12 @@ class MapHelper {
         locationComponent?.isLocationComponentEnabled = true
         locationComponent?.cameraMode = CameraMode.TRACKING
         locationComponent?.renderMode = RenderMode.NORMAL
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+
+        if (helper.isGooglePlayServicesAvailable(context)) {
+            fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+        } else {
+            locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        }
         initLocationEngine(object : LocationCallback() {})
     }
 
@@ -149,6 +163,15 @@ class MapHelper {
 
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun initLocationEngine(locationCallback: LocationCallback) {
+        if (fusedLocationClient != null) {
+            initLocationEngineWithFusedLocationClient(locationCallback)
+        } else {
+            initLocationEngineWithLocationManager(locationCallback)
+        }
+    }
+
+    @RequiresPermission(anyOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
+    private fun initLocationEngineWithFusedLocationClient(locationCallback: LocationCallback) {
         coroutineScope.launch {
             fusedLocationClient?.locationAvailability?.addOnSuccessListener {
                 if (!it.isLocationAvailable) {
@@ -164,8 +187,29 @@ class MapHelper {
                     locationCallback,
                     Looper.getMainLooper(),
                 )
-
             }
+        }
+    }
+
+    @RequiresPermission(anyOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
+    private fun initLocationEngineWithLocationManager(locationCallback: LocationCallback) {
+        coroutineScope.launch {
+            val locationListener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    val locationResult = LocationResult.create(arrayListOf(location))
+                    locationCallback.onLocationResult(locationResult)
+                }
+
+                override fun onProviderEnabled(provider: String) {}
+                override fun onProviderDisabled(provider: String) {}
+            }
+            locationManager?.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                FREQUENCY,
+                MIN_DISTANCE,
+                locationListener,
+                Looper.getMainLooper()
+            )
         }
     }
 }

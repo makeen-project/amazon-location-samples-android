@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, MapLibreMap.OnCame
             mainViewModel.enableLocationComponent(this)
         }
         if (mainViewModel.isLocationTrackingForegroundActive) {
-            mainViewModel.stopTrackingForeground()
+            mainViewModel.stopTrackingForeground(applicationContext)
         } else {
             mainViewModel.setLiveTracking()
             mainViewModel.startTrackingForeground(
