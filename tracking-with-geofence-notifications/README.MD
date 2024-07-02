@@ -23,7 +23,7 @@ Additional documentation for this sample application is available from the [Amaz
 Create a `custom.properties` file in your project directory and input the following lines, replacing placeholders with actual values:
 
  ```properties
- MQTT_END_POINT=xxxxxxxxxxxxx-xxx.xxx.us-east-1.amazonaws.com
+ MQTT_END_POINT=xxxxxxxxxxxxx-xxx.xxx.<MY-AWS-REGION>.amazonaws.com
  POLICY_NAME=xxxxxxxxx
  GEOFENCE_COLLECTION_NAME=xxxxxxxxxxxxxxxxx
  TOPIC_TRACKER=xxxxxxxxxx
@@ -52,7 +52,7 @@ These filters help in optimizing the location tracking to suit different use cas
 
     ```properties
     DEFAULT_TRACKER_NAME=xxxxxxx
-    TEST_POOL_ID=us-east-1:xxxxxxxxxxxxxxxxxxxxxxxxxx
+    TEST_POOL_ID=<MY-AWS-REGION>:xxxxxxxxxxxxxxxxxxxxxxxxxx
     TEST_MAP_NAME=xxxxxxxxxxxxxxxxxxx
    ```
 
