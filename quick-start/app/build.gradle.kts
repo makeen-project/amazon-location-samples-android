@@ -75,16 +75,8 @@ dependencies {
     implementation(libs.org.maplibre.gl)
     implementation(libs.com.squareup.okhttp3)
     implementation(libs.location)
-    if (findProject(":authSdk") != null) {
-        implementation(project(mapOf("path" to ":authSdk")))
-    } else {
-        implementation(libs.auth)
-    }
-    if (findProject(":trackingSdk") != null) {
-        implementation(project(mapOf("path" to ":trackingSdk")))
-    } else {
-        implementation(libs.tracking)
-    }
+    implementation(libs.auth)
+    implementation(libs.tracking)
     testImplementation(libs.mockk)
     testImplementation(libs.mockito.core)
     androidTestImplementation(libs.androidx.uiautomator)
