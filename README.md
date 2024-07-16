@@ -5,6 +5,7 @@ This repository contains a set of sample applications for Amazon Location Servic
 ## List of sample apps
 
 - [Use the Amazon Location Mobile Tracking SDK with geofences](tracking-with-geofence-notifications)
+- [Use the Amazon Location Quick start application](quick-start)
 
 ## Security
 
