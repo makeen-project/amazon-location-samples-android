@@ -26,7 +26,16 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-      
+
+      - name: Create empty custom.properties
+        working-directory: ./quick-start
+        run: touch custom.properties
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+        with:
+         build-root-directory: ./quick-start
+
       - name: Build with Gradle
         working-directory: ./quick-start
         run: ./gradlew build
