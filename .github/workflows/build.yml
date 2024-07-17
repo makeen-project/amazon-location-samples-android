@@ -2,8 +2,6 @@ name: build
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -30,4 +28,5 @@ jobs:
         uses: android-actions/setup-android@v3
       
       - name: Build with Gradle
+        working-directory: ./quick-start
         run: ./gradlew build
