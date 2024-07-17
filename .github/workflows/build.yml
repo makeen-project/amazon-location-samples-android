@@ -36,6 +36,10 @@ jobs:
         with:
          build-root-directory: ./quick-start
 
+      - name: Make gradlew executable
+        working-directory: ./quick-start
+        run: chmod +x ./gradlew
+
       - name: Build with Gradle
         working-directory: ./quick-start
         run: ./gradlew build
