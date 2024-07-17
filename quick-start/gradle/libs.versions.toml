@@ -13,9 +13,9 @@ maplibre = "11.0.0-pre5"
 mockitoCore = "4.7.0"
 mockk = "1.13.10"
 okhttp = "4.9.2"
-auth = "0.2.4"
 playServicesLocation = "21.2.0"
-tracking = "0.2.4"
+auth = "0.2.5"
+tracking = "0.2.5"
 uiautomator = "2.3.0"
 
 [libraries]
